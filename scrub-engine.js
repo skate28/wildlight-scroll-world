@@ -132,7 +132,12 @@ function mountScrollWorld(container, config) {
   const copylayer = el('div', 'sw-copylayer');
   const route = el('div', 'sw-route');
   const hint = el('div', 'sw-hint');
-  const hintText = el('span'); hintText.textContent = config.hint || 'scroll'; hint.appendChild(hintText);
+  const readyHint = config.hint || 'scroll';
+  const hintText = el('span');
+  hintText.textContent = reduce
+    ? (config.reducedHint || 'scroll to explore')
+    : (isMobile() ? (config.loadingHint || 'preparing flight') : readyHint);
+  hint.appendChild(hintText);
   hint.appendChild(el('i'));
   const track = el('div', 'sw-track');
 
@@ -215,9 +220,16 @@ function mountScrollWorld(container, config) {
       const v = document.createElement('video');
       v.className = 'sw-scene__video';
       v.muted = true; v.defaultMuted = true; v.playsInline = true;
-      v.preload = mobile ? 'metadata' : 'auto';
+      v.preload = 'auto';
       v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
-      v.addEventListener('loadedmetadata', () => { s.ready = true; read(); });
+      v.addEventListener('loadedmetadata', () => {
+        s.ready = true;
+        if (s === SEGMENTS[0]) {
+          hintText.textContent = readyHint;
+          hint.classList.add('is-ready');
+        }
+        read();
+      });
       // Reveal the video (hide the still poster) only once a real frame has
       // painted — on iOS a seeked-but-never-played muted video stays blank, so
       // hiding the still on metadata alone would flash an empty scene.
@@ -236,14 +248,9 @@ function mountScrollWorld(container, config) {
       v.load();
     }
 
-    if (mobile) {
-      // Do not fetch().blob() on phones: that waits for the entire 9–16 MB clip
-      // before creating a video element, making the page look frozen on cellular.
-      // Netlify supports byte ranges, so a direct URL paints and seeks immediately.
-      attachVideo(url);
-      return;
-    }
-
+    // The phone masters are deliberately sub-megabyte-to-low-megabyte files.
+    // Downloading one into a Blob gives Safari instant local seeks and avoids
+    // repeated/cancelled CDN range requests while a finger is moving.
     fetch(url).then(r => r.ok ? r.blob() : Promise.reject(new Error('404')))
       .then(blob => attachVideo(URL.createObjectURL(blob)))
       .catch(() => { s.loading = false; });
