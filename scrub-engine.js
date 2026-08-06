@@ -75,7 +75,9 @@ function mountScrollWorld(container, config) {
   const CONNECTORS = config.connectors || [];
   const CONNECTORS_M = config.connectorsMobile || [];
   const DIVE_W = config.diveScroll || 1.3;
+  const DIVE_W_M = config.diveScrollMobile || DIVE_W;
   const CONN_W = config.connScroll || 0.9;
+  const CONN_W_M = config.connScrollMobile || CONN_W;
   const CROSSFADE = (config.crossfade != null) ? config.crossfade : 0.12;  // seam dissolve width (vh)
   const N = SECTIONS.length;
   if (!N) return;
@@ -87,7 +89,8 @@ function mountScrollWorld(container, config) {
   const SEGMENTS = [];
   SECTIONS.forEach((s, i) => {
     const dive = { kind: 'dive', si: i, clip: s.clip, clipM: s.clipMobile, still: s.still, stillM: s.stillMobile,
-                   accent: s.accent, w: s.scroll || DIVE_W, linger: s.linger || 0 };
+                   accent: s.accent, w: s.scroll || DIVE_W, wM: s.scrollMobile || s.scroll || DIVE_W_M,
+                   linger: s.linger || 0 };
     SEGMENTS.push(dive);
     s._seg = dive;
     // A connector is optional: if connectors[i] is falsy, the two dives simply
@@ -96,7 +99,7 @@ function mountScrollWorld(container, config) {
     if (i < N - 1 && CONNECTORS[i]) {
       SEGMENTS.push({ kind: 'conn', si: i, clip: CONNECTORS[i], clipM: CONNECTORS_M[i],
                       still: SECTIONS[i + 1].still, stillM: SECTIONS[i + 1].stillMobile,
-                      accent: SECTIONS[i + 1].accent, w: CONN_W });
+                      accent: SECTIONS[i + 1].accent, w: CONN_W, wM: CONN_W_M });
     }
   });
   const NSEG = SEGMENTS.length;
@@ -183,8 +186,12 @@ function mountScrollWorld(container, config) {
     vh = window.innerHeight;
     laidOutW = window.innerWidth;
     stageX = window.innerWidth > 860 ? 4 : 0;
+    const mobile = isMobile();
     let off = 0;
-    SEGMENTS.forEach(s => { s.start = off * vh; off += s.w; s.end = off * vh; });
+    SEGMENTS.forEach(s => {
+      const w = mobile ? (s.wM != null ? s.wM : s.w) : s.w;
+      s.start = off * vh; off += w; s.end = off * vh;
+    });
     totalW = off;
     track.style.height = (totalW * vh + vh) + 'px';   // +1vh so the last flight completes
     read();
@@ -222,12 +229,13 @@ function mountScrollWorld(container, config) {
   function read() {
     const y = window.scrollY || window.pageYOffset;
     const fade = CROSSFADE * vh;
+    const prefetch = isMobile() ? 2.8 * vh : 1.6 * vh;
     let ci = 0;
     for (let i = 0; i < NSEG; i++) if (y >= SEGMENTS[i].start) ci = i;
 
     for (let i = 0; i < NSEG; i++) {
       const s = SEGMENTS[i];
-      if (y > s.start - 1.6 * vh && y < s.end + 1.6 * vh) loadClip(s);
+      if (y > s.start - prefetch && y < s.end + prefetch) loadClip(s);
       const local = clamp((y - s.start) / (s.end - s.start), 0, 1);
       s.target = s.linger ? lingerEase(local, s.linger) : local;
       let outside = 0;
@@ -271,7 +279,10 @@ function mountScrollWorld(container, config) {
   }
 
   function raf() {
-    const eps = isMobile() ? 0.02 : 0.008;   // coarser seek step on phones = fewer decodes
+    const mobile = isMobile();
+    // Coarser seek step on phones = fewer decodes; tighter lerp catch-up so flick
+    // momentum doesn't leave the frame lagging a beat behind the finger.
+    const eps = mobile ? 0.028 : 0.008;
     for (let i = 0; i < NSEG; i++) {
       const s = SEGMENTS[i];
       if (!s.hasClip || !s.ready || !s.video) continue;
@@ -279,8 +290,11 @@ function mountScrollWorld(container, config) {
       // On phones a fast flick would otherwise pile up seeks and freeze the clip;
       // cur keeps lerping, so we snap to the latest target the moment it's free.
       if (s.video.seeking) continue;
-      if (!s.visible && Math.abs(s.cur - s.target) < 0.002) continue;
-      s.cur += (s.target - s.cur) * (reduce ? 1 : 0.18);
+      const delta = s.target - s.cur;
+      if (!s.visible && Math.abs(delta) < 0.002) continue;
+      let alpha = reduce ? 1 : 0.18;
+      if (mobile && !reduce) alpha = Math.abs(delta) > 0.1 ? 0.55 : 0.32;
+      s.cur += delta * alpha;
       const dur = s.video.duration || 1;
       const t = clamp(s.cur, 0, 0.999) * dur;
       if (Math.abs(s.video.currentTime - t) > eps) { try { s.video.currentTime = t; } catch (e) {} }
@@ -360,7 +374,8 @@ function injectCSS() {
     --sw-font-display:ui-rounded,"SF Pro Rounded","Segoe UI",system-ui,sans-serif;
     --sw-font-body:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
     color:var(--sw-ink);font-family:var(--sw-font-body);}
-  html,body{margin:0;background:var(--sw-bg,#F5EDE0);overflow-x:hidden;}
+  html,body{margin:0;background:var(--sw-bg,#F5EDE0);overflow-x:hidden;overscroll-behavior-y:none;}
+  .sw-root{touch-action:pan-y;-webkit-overflow-scrolling:touch;}
   .sw-sky{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:var(--sw-bg);}
   .sw-sky__grad{position:absolute;inset:-10%;background:linear-gradient(178deg,color-mix(in srgb,var(--sw-accent) 12%,var(--sw-bg)) 0%,var(--sw-bg) 55%,color-mix(in srgb,var(--sw-accent) 6%,var(--sw-bg)) 100%);}
   .sw-sky__glow{position:absolute;inset:0;background:radial-gradient(60% 42% at 74% 16%,color-mix(in srgb,var(--sw-accent) 22%,transparent),transparent 70%),radial-gradient(46% 34% at 50% 50%,color-mix(in srgb,#fff 45%,transparent),transparent 70%);}
@@ -432,6 +447,7 @@ function injectCSS() {
     .sw-route{padding:14px 6px;}
     .sw-route__dot{width:28px;height:28px;}
     .sw-btn{padding:15px 26px;}
+    .sw-scene__video,.sw-scene__still{will-change:opacity;transform:translateZ(0);}
   }
   @media (prefers-reduced-motion:reduce){ .sw-hint i::after{animation:none;} .sw-pt{display:none;} }
   `;
