@@ -1,0 +1,20 @@
+# Dependencies / tooling
+node_modules/
+.netlify/
+.DS_Store
+Thumbs.db
+
+# Generation scratch (prompts, JSON, mid-frames, last frames)
+work/
+
+# Skill copy (local agent only)
+.agents/
+
+# Raw / drifted video masters (site uses encoded cabin.mp4 etc.)
+assets/vid/leg_*.mp4
+assets/vid/*_archa_drift.mp4
+
+# Local env / secrets
+.env
+.env.*
+*.pem
