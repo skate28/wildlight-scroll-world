@@ -207,29 +207,54 @@ function mountScrollWorld(container, config) {
     // and simply cross-dissolve as you scroll. No scrubbed video motion, no decode cost.
     if (reduce || s.loading || !s.clip) return;
     s.loading = true;
+    const mobile = isMobile();
     // Serve the lighter mobile encode on phones when one was provided.
-    const url = (isMobile() && s.clipM) ? s.clipM : s.clip;
+    const url = (mobile && s.clipM) ? s.clipM : s.clip;
+
+    function attachVideo(src) {
+      const v = document.createElement('video');
+      v.className = 'sw-scene__video';
+      v.muted = true; v.defaultMuted = true; v.playsInline = true;
+      v.preload = mobile ? 'metadata' : 'auto';
+      v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
+      v.addEventListener('loadedmetadata', () => { s.ready = true; read(); });
+      // Reveal the video (hide the still poster) only once a real frame has
+      // painted — on iOS a seeked-but-never-played muted video stays blank, so
+      // hiding the still on metadata alone would flash an empty scene.
+      v.addEventListener('seeked', () => { s.el.classList.add('has-clip'); }, { once: true });
+      v.addEventListener('loadeddata', () => {
+        try { v.pause(); } catch (e) {}
+        if (userReady) primeVideo(v);
+      });
+      v.addEventListener('error', () => {
+        s.loading = false; s.ready = false; s.hasClip = false;
+        if (s.video === v) s.video = null;
+        v.remove();
+      }, { once: true });
+      s.el.appendChild(v); s.video = v; s.hasClip = true;
+      v.src = src;
+      v.load();
+    }
+
+    if (mobile) {
+      // Do not fetch().blob() on phones: that waits for the entire 9–16 MB clip
+      // before creating a video element, making the page look frozen on cellular.
+      // Netlify supports byte ranges, so a direct URL paints and seeks immediately.
+      attachVideo(url);
+      return;
+    }
+
     fetch(url).then(r => r.ok ? r.blob() : Promise.reject(new Error('404')))
-      .then(blob => {
-        const v = document.createElement('video');
-        v.className = 'sw-scene__video';
-        v.muted = true; v.playsInline = true; v.preload = 'auto';
-        v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
-        v.src = URL.createObjectURL(blob);
-        v.addEventListener('loadedmetadata', () => { s.ready = true; read(); });
-        // Reveal the video (hide the still poster) only once a real frame has
-        // painted — on iOS a seeked-but-never-played muted video stays blank, so
-        // hiding the still on metadata alone would flash an empty scene.
-        v.addEventListener('seeked', () => { s.el.classList.add('has-clip'); }, { once: true });
-        v.addEventListener('loadeddata', () => { try { v.pause(); } catch (e) {} if (userReady) primeVideo(v); });
-        s.el.appendChild(v); s.video = v; s.hasClip = true;
-      }).catch(() => { s.loading = false; });
+      .then(blob => attachVideo(URL.createObjectURL(blob)))
+      .catch(() => { s.loading = false; });
   }
 
   function read() {
     const y = window.scrollY || window.pageYOffset;
     const fade = CROSSFADE * vh;
-    const prefetch = isMobile() ? 2.8 * vh : 1.6 * vh;
+    // On phones, load only the current/next scene. Starting two full video
+    // transfers at once can starve the first painted frame on cellular.
+    const prefetch = isMobile() ? 1.35 * vh : 1.6 * vh;
     let ci = 0;
     for (let i = 0; i < NSEG; i++) if (y >= SEGMENTS[i].start) ci = i;
 
