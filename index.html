@@ -5,10 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Wildlight — extraordinary stays</title>
   <meta name="description" content="Scroll to fly through Wildlight — a continuous cinematic walkthrough of extraordinary vacation homes." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preload" as="fetch" type="video/mp4" href="assets/vid/cabin-mobile-v3.mp4" media="(max-width: 860px)" crossorigin fetchpriority="high" />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="preload" as="fetch" type="video/mp4" href="assets/vid/cabin-mobile-v4.mp4" media="(max-width: 860px)" crossorigin fetchpriority="high" />
   <style>
     :root, .sw-root {
       --sw-bg: #0B0D10;
@@ -20,14 +17,16 @@
       margin: 0;
       background: #0B0D10;
       color: #E8DFD2;
-      font-family: "Outfit", sans-serif;
-      font-weight: 300;
     }
-    .sw-root .sw-brand,
-    .sw-root .sw-title {
-      font-family: "Cormorant Garamond", Georgia, serif;
-      font-weight: 500;
-      letter-spacing: 0.02em;
+    /* Immersive film mode: video + scroll hint only */
+    .sw-topbar,
+    .sw-copylayer,
+    .sw-route,
+    .sw-scrollbar {
+      display: none !important;
+    }
+    .sw-hint {
+      color: rgba(232, 223, 210, 0.72) !important;
     }
   </style>
 </head>
@@ -35,14 +34,13 @@
   <div id="top"></div>
   <div id="world"></div>
 
-  <script src="scrub-engine.js?v=mobile-stream-2"></script>
+  <script src="scrub-engine.js?v=film-hq-1"></script>
   <script>
     mountScrollWorld(document.getElementById('world'), {
-      brand: { name: 'Wildlight', href: '#top' },
-      cta: { label: 'Inquire', href: '#loft' },
+      nav: false,
+      atmosphere: true,
       hint: 'scroll to fly through',
       diveScroll: 1.45,
-      // Extra scroll distance on phones so each seek covers less timeline per flick.
       diveScrollMobile: 2.05,
       connScroll: 0.9,
       crossfade: 0.1,
@@ -52,64 +50,40 @@
           label: 'Alpine',
           still: 'assets/stills/cabin.webp',
           clip: 'assets/vid/cabin.mp4',
-          clipMobile: 'assets/vid/cabin-mobile-v3.mp4',
+          clipMobile: 'assets/vid/cabin-mobile-v4.mp4',
           accent: '#7A8F7A',
-          eyebrow: 'Mountain hush',
-          title: 'Arrive to the hearth.',
-          body: 'Cedar, stone, and a wall of glass facing the ridge — the day slows the moment you cross the threshold.',
-          tags: ['Alpine cabin', 'Golden hour', 'Unhurried'],
         },
         {
           id: 'beach',
           label: 'Coast',
           still: 'assets/stills/beach.webp',
           clip: 'assets/vid/beach.mp4',
-          clipMobile: 'assets/vid/beach-mobile-v3.mp4',
+          clipMobile: 'assets/vid/beach-mobile-v4.mp4',
           accent: '#C47A4A',
-          eyebrow: 'Oceanfront',
-          title: 'Live beside the horizon.',
-          body: 'A pavilion of light and linen, opened fully to salt air and the long line of the shore.',
-          tags: ['Ocean villa', 'Floor-to-ceiling glass'],
         },
         {
           id: 'treehouse',
           label: 'Canopy',
           still: 'assets/stills/treehouse.webp',
           clip: 'assets/vid/treehouse.mp4',
-          clipMobile: 'assets/vid/treehouse-mobile-v3.mp4',
+          clipMobile: 'assets/vid/treehouse-mobile-v4.mp4',
           accent: '#B8956C',
-          eyebrow: 'Among the trees',
-          title: 'Sleep in the canopy.',
-          body: 'A suspended suite of timber and quiet — deck rails open to mist, birdsong, and green light.',
-          tags: ['Treehouse suite', 'Forest immersion'],
         },
         {
           id: 'desert',
           label: 'Desert',
           still: 'assets/stills/desert.webp',
           clip: 'assets/vid/desert.mp4',
-          clipMobile: 'assets/vid/desert-mobile-v3.mp4',
+          clipMobile: 'assets/vid/desert-mobile-v4.mp4',
           accent: '#C47A4A',
-          eyebrow: 'Warm stone',
-          title: 'Courtyard at dusk.',
-          body: 'Adobe arches, a still fountain, and the desert sky held in a private square of shade.',
-          tags: ['Desert retreat', 'Courtyard'],
         },
         {
           id: 'loft',
           label: 'City',
           still: 'assets/stills/loft.webp',
           clip: 'assets/vid/loft.mp4',
-          clipMobile: 'assets/vid/loft-mobile-v3.mp4',
+          clipMobile: 'assets/vid/loft-mobile-v4.mp4',
           accent: '#9AA3AD',
-          eyebrow: 'And finally',
-          title: 'The city, held soft.',
-          body: 'A penthouse loft where evening settles against glass — the last light of a journey through extraordinary stays.',
-          tags: ['Penthouse', 'Skyline'],
-          cta: {
-            primary: { label: 'Request a stay', href: '#top' },
-            secondary: { label: 'Back to start', href: '#top' },
-          },
         },
       ],
       connectors: [],
