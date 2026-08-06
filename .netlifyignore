@@ -1,0 +1,7 @@
+work/
+.agents/
+.git/
+assets/vid/leg_*.mp4
+assets/vid/*_archa_drift.mp4
+node_modules/
+*.ps1
