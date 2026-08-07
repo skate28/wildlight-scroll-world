@@ -3,6 +3,11 @@ work/
 .git/
 assets/vid/leg_*.mp4
 assets/vid/*_archa_drift.mp4
+assets/vid/cabin.mp4
+assets/vid/beach.mp4
+assets/vid/treehouse.mp4
+assets/vid/desert.mp4
+assets/vid/loft.mp4
 node_modules/
 src/
 scripts/

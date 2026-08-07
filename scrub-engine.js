@@ -270,9 +270,10 @@ function mountScrollWorld(container, config) {
   function read() {
     const y = window.scrollY || window.pageYOffset;
     const fade = CROSSFADE * vh;
-    // On phones, load only the current/next scene. Starting two full video
-    // transfers at once can starve the first painted frame on cellular.
-    const prefetch = isMobile() ? 1.35 * vh : 1.6 * vh;
+    // Do not start the next desktop master on the opening frame. Giving the
+    // current clip first use of the connection gets real camera motion onscreen
+    // sooner; the next clip begins preloading partway through the current dive.
+    const prefetch = isMobile() ? 1.35 * vh : 1.0 * vh;
     let ci = 0;
     for (let i = 0; i < NSEG; i++) if (y >= SEGMENTS[i].start) ci = i;
 
@@ -329,6 +330,12 @@ function mountScrollWorld(container, config) {
     for (let i = 0; i < NSEG; i++) {
       const s = SEGMENTS[i];
       if (!s.hasClip || !s.ready || !s.video) continue;
+      // Preloaded URL streams should not consume range requests while hidden.
+      // Their latest target is applied once the scene enters the crossfade.
+      if (s.stream && !s.visible) {
+        s.cur = s.target;
+        continue;
+      }
       // Never queue a seek while the decoder is still resolving the last one.
       // On phones a fast flick would otherwise pile up seeks and freeze the clip;
       // cur keeps lerping, so we snap to the latest target the moment it's free.
