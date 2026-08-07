@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Wildlight — extraordinary stays</title>
   <meta name="description" content="Scroll to fly through Wildlight — a continuous cinematic walkthrough of extraordinary vacation homes." />
+  <link rel="preload" as="fetch" type="video/mp4" href="assets/vid/cabin-desktop-v3.mp4" media="(min-width: 861px)" crossorigin fetchpriority="high" />
   <link rel="preload" as="fetch" type="video/mp4" href="assets/vid/cabin-mobile-v4.mp4" media="(max-width: 860px)" crossorigin fetchpriority="high" />
-  <link rel="stylesheet" href="booking.css?v=xrpl-escrow-2" />
+  <link rel="stylesheet" href="booking.css?v=xrpl-escrow-3" />
   <style>
     :root, .sw-root {
       --sw-bg: #0B0D10;
@@ -35,12 +36,13 @@
   <div id="top"></div>
   <div id="world"></div>
 
-  <script src="scrub-engine.js?v=blob-flight-2"></script>
+  <script src="scrub-engine.js?v=blob-flight-3"></script>
   <script>
     mountScrollWorld(document.getElementById('world'), {
       nav: false,
       atmosphere: true,
       hint: 'scroll to fly through',
+      loadingHint: 'preparing flight',
       diveScroll: 1.45,
       diveScrollMobile: 2.05,
       connScroll: 0.9,
@@ -50,7 +52,7 @@
           id: 'cabin',
           label: 'Alpine',
           still: 'assets/stills/cabin.webp',
-          clip: 'assets/vid/cabin-desktop-v2.mp4',
+          clip: 'assets/vid/cabin-desktop-v3.mp4',
           clipMobile: 'assets/vid/cabin-mobile-v4.mp4',
           accent: '#7A8F7A',
         },
@@ -58,7 +60,7 @@
           id: 'beach',
           label: 'Coast',
           still: 'assets/stills/beach.webp',
-          clip: 'assets/vid/beach-desktop-v2.mp4',
+          clip: 'assets/vid/beach-desktop-v3.mp4',
           clipMobile: 'assets/vid/beach-mobile-v4.mp4',
           accent: '#C47A4A',
         },
@@ -66,7 +68,7 @@
           id: 'treehouse',
           label: 'Canopy',
           still: 'assets/stills/treehouse.webp',
-          clip: 'assets/vid/treehouse-desktop-v2.mp4',
+          clip: 'assets/vid/treehouse-desktop-v3.mp4',
           clipMobile: 'assets/vid/treehouse-mobile-v4.mp4',
           accent: '#B8956C',
         },
@@ -74,7 +76,7 @@
           id: 'desert',
           label: 'Desert',
           still: 'assets/stills/desert.webp',
-          clip: 'assets/vid/desert-desktop-v2.mp4',
+          clip: 'assets/vid/desert-desktop-v3.mp4',
           clipMobile: 'assets/vid/desert-mobile-v4.mp4',
           accent: '#C47A4A',
         },
@@ -82,7 +84,7 @@
           id: 'loft',
           label: 'City',
           still: 'assets/stills/loft.webp',
-          clip: 'assets/vid/loft-desktop-v2.mp4',
+          clip: 'assets/vid/loft-desktop-v3.mp4',
           clipMobile: 'assets/vid/loft-mobile-v4.mp4',
           accent: '#9AA3AD',
         },
@@ -98,7 +100,7 @@
         loaded = true;
         window.removeEventListener('scroll', maybeLoadBooking);
         const script = document.createElement('script');
-        script.src = 'booking.bundle.js?v=xrpl-escrow-2';
+        script.src = 'booking.bundle.js?v=xrpl-escrow-3';
         script.async = true;
         document.body.appendChild(script);
       };

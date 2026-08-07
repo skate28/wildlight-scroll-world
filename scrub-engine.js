@@ -136,7 +136,7 @@ function mountScrollWorld(container, config) {
   const hintText = el('span');
   hintText.textContent = reduce
     ? (config.reducedHint || 'scroll to explore')
-    : (isMobile() ? (config.loadingHint || 'preparing flight') : readyHint);
+    : (config.loadingHint || 'preparing flight');
   hint.appendChild(hintText);
   hint.appendChild(el('i'));
   const track = el('div', 'sw-track');
@@ -367,6 +367,8 @@ function mountScrollWorld(container, config) {
   window.addEventListener('orientationchange', layout);
   window.addEventListener('load', layout);
   layout();
+  // Kick the opening dive immediately so the Blob is ready before the first scroll.
+  if (SEGMENTS[0]) loadClip(SEGMENTS[0]);
   requestAnimationFrame(raf);
 
   // ---- helpers ----

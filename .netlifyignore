@@ -8,6 +8,7 @@ assets/vid/beach.mp4
 assets/vid/treehouse.mp4
 assets/vid/desert.mp4
 assets/vid/loft.mp4
+assets/vid/*-desktop-v2.mp4
 node_modules/
 src/
 scripts/
