@@ -150,7 +150,7 @@ function mountScrollWorld(container, config) {
     const poster = (isMobile() && s.stillM) ? s.stillM : s.still;
     if (poster) img.src = poster;
     scene.appendChild(img); stage.appendChild(scene);
-    s.el = scene; s.img = img; s.video = null; s.hasClip = false;
+    s.el = scene; s.img = img; s.video = null; s.hasClip = false; s.stream = false;
     s.loading = false; s.ready = false; s.cur = 0; s.target = 0; s.visible = false;
   });
 
@@ -246,7 +246,7 @@ function mountScrollWorld(container, config) {
         if (s.video === v) s.video = null;
         v.remove();
       }, { once: true });
-      s.el.appendChild(v); s.video = v; s.hasClip = true;
+      s.el.appendChild(v); s.video = v; s.hasClip = true; s.stream = stream;
       v.src = src;
       v.load();
     }
@@ -335,7 +335,9 @@ function mountScrollWorld(container, config) {
       if (s.video.seeking) continue;
       const delta = s.target - s.cur;
       if (!s.visible && Math.abs(delta) < 0.002) continue;
-      let alpha = reduce ? 1 : 0.18;
+      // A streamed file may need a new byte-range request for every seek. Jump
+      // directly to its latest scroll target instead of queuing many eased seeks.
+      let alpha = (reduce || s.stream) ? 1 : 0.18;
       if (mobile && !reduce) alpha = Math.abs(delta) > 0.1 ? 0.55 : 0.32;
       s.cur += delta * alpha;
       const dur = s.video.duration || 1;
