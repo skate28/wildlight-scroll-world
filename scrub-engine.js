@@ -207,6 +207,10 @@ function mountScrollWorld(container, config) {
     window.scrollTo({ top: seg.start + (seg.end - seg.start) * 0.5, behavior: reduce ? 'auto' : 'smooth' });
   }
 
+  // One Blob transfer at a time. Parallel multi-MB downloads over Netlify HTTP/2
+  // were aborting with ERR_HTTP2_PROTOCOL_ERROR and leaving the still-zoom fallback.
+  let clipQueue = Promise.resolve();
+
   function loadClip(s) {
     // Under prefers-reduced-motion we never load the clips at all — the stills stay up
     // and simply cross-dissolve as you scroll. No scrubbed video motion, no decode cost.
@@ -248,25 +252,25 @@ function mountScrollWorld(container, config) {
       v.load();
     }
 
-    // Compact desktop + mobile masters download into Blobs so every seek is local.
-    // That restores the real camera flight instead of the still-image zoom fallback.
-    fetch(url).then(r => r.ok ? r.blob() : Promise.reject(new Error('404')))
-      .then(blob => attachVideo(URL.createObjectURL(blob)))
+    clipQueue = clipQueue
+      .catch(() => {})
+      .then(() => fetch(url).then((r) => (r.ok ? r.blob() : Promise.reject(new Error('404')))))
+      .then((blob) => attachVideo(URL.createObjectURL(blob)))
       .catch(() => { s.loading = false; });
   }
 
   function read() {
     const y = window.scrollY || window.pageYOffset;
     const fade = CROSSFADE * vh;
-    // On phones, load only the current/next scene. Starting two full video
-    // transfers at once can starve the first painted frame on cellular.
-    const prefetch = isMobile() ? 1.35 * vh : 1.6 * vh;
     let ci = 0;
     for (let i = 0; i < NSEG; i++) if (y >= SEGMENTS[i].start) ci = i;
+    // Load the active clip first; only queue the next one after the current clip
+    // is seekable so we never open two multi-MB transfers at once.
+    const loadAhead = SEGMENTS[ci]?.ready ? 1 : 0;
 
     for (let i = 0; i < NSEG; i++) {
       const s = SEGMENTS[i];
-      if (y > s.start - prefetch && y < s.end + prefetch) loadClip(s);
+      if (i === ci || i === ci + loadAhead) loadClip(s);
       const local = clamp((y - s.start) / (s.end - s.start), 0, 1);
       s.target = s.linger ? lingerEase(local, s.linger) : local;
       let outside = 0;
