@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node --test test/booking-utils.test.js",
+    "test": "node --test test/booking-utils.test.js test/testnet-faucet.test.js",
     "check": "npm run test && npm run build"
   },
   "dependencies": {

@@ -8,7 +8,7 @@ import {
   XyraAdapter,
   isWalletError,
 } from 'xrpl-connect';
-import { Client, getNFTokenID, xrpToDrops } from 'xrpl';
+import { Client, dropsToXrp, getNFTokenID, xrpToDrops } from 'xrpl';
 import {
   buildEscrowAction,
   buildEscrowCreate,
@@ -17,6 +17,7 @@ import {
   parseEscrowTransaction,
   transactionResult,
 } from './booking-utils.js';
+import { ensureTestnetAddressFunded, readAccountInfo } from './testnet-faucet.js';
 
 const BUILD_CONFIG =
   typeof __WILDLIGHT_CONFIG__ !== 'undefined' ? __WILDLIGHT_CONFIG__ : {};
@@ -25,7 +26,7 @@ const config = {
   network: 'testnet',
   ws: 'wss://s.altnet.rippletest.net:51233',
   explorer: 'https://testnet.xrpl.org',
-  faucet: 'https://xrpl.org/resources/dev-tools/xrp-faucets',
+  faucetApi: 'https://faucet.altnet.rippletest.net/accounts',
   destination: 'rJAz9M9KnQ8pzSSzcVgXdm3V9AEJhrbe5L',
   amountXrp: '50',
   nights: 3,
@@ -44,6 +45,10 @@ const state = {
   engaged: Boolean(receiptHashFromUrl),
   connectedAddress: null,
   busy: false,
+  fundingWallet: false,
+  walletFundingAddress: null,
+  walletFundingPromise: null,
+  walletBalanceXrp: null,
   booking: null,
   receipt: null,
   managedBooking: null,
@@ -108,8 +113,8 @@ root.innerHTML = `
         </button>
 
         <p class="wl-booking__fineprint">
-          Testnet XRP has no monetary value. Your wallet shows every transaction before
-          signing; this site never receives your secret key.
+          New wallets receive 100 test XRP automatically. Testnet XRP has no monetary
+          value; this site never receives your secret key.
         </p>
 
         <button type="button" class="wl-booking__manage-link" data-open-manage>
@@ -233,19 +238,16 @@ elements.connector.setAttribute('wallets', adapters.map((adapter) => adapter.id)
 if (config.xamanApiKey) elements.connector.setAttribute('primary-wallet', 'xaman');
 elements.connector.setWalletManager(walletManager);
 
-walletManager.on('connect', (account) => {
-  state.connectedAddress = account.address;
-  updateWalletState();
-  clearStatus();
-});
+walletManager.on('connect', useConnectedAccount);
 walletManager.on('disconnect', () => {
   state.connectedAddress = null;
+  state.walletBalanceXrp = null;
+  state.fundingWallet = false;
+  state.walletFundingAddress = null;
+  state.walletFundingPromise = null;
   updateWalletState();
 });
-walletManager.on('accountChanged', (account) => {
-  state.connectedAddress = account.address;
-  updateWalletState();
-});
+walletManager.on('accountChanged', useConnectedAccount);
 walletManager.on('networkChanged', (network) => {
   if (network?.id && network.id !== config.network) {
     showStatus('Wrong network', `Switch your wallet to XRPL ${labelNetwork(config.network)}.`, 'error');
@@ -256,11 +258,17 @@ walletManager.on('error', (error) => {
 });
 
 void walletManager.reconnect().then((account) => {
-  if (account) {
-    state.connectedAddress = account.address;
-    updateWalletState();
-  }
+  if (account && state.connectedAddress !== account.address) useConnectedAccount(account);
 });
+
+function useConnectedAccount(account) {
+  if (!account?.address) return;
+  state.connectedAddress = account.address;
+  state.walletBalanceXrp = null;
+  clearStatus();
+  updateWalletState();
+  void prepareConnectedWallet(account.address);
+}
 
 function utcDateInput(daysFromNow) {
   const date = new Date();
@@ -326,7 +334,7 @@ function updateStayTerms() {
     elements.checkOut.textContent = formatDate(stay.checkOutAt);
     elements.release.textContent = formatDateTime(stay.finishAt);
     elements.refund.textContent = formatDateTime(stay.cancelAt);
-    elements.create.disabled = !state.connectedAddress || state.busy;
+    elements.create.disabled = !state.connectedAddress || state.busy || state.fundingWallet;
     clearStatus();
   } catch (error) {
     elements.create.disabled = true;
@@ -336,12 +344,14 @@ function updateStayTerms() {
 
 function updateWalletState() {
   const connected = Boolean(state.connectedAddress);
+  const balance = state.walletBalanceXrp == null ? '' : ` · ${state.walletBalanceXrp} XRP`;
+  const funding = state.fundingWallet ? ' · funding…' : '';
   elements.walletState.textContent = connected
-    ? `Connected · ${truncate(state.connectedAddress)}`
+    ? `Connected · ${truncate(state.connectedAddress)}${funding || balance}`
     : 'No wallet connected';
   elements.walletButton.textContent = connected ? 'Change wallet' : 'Connect wallet';
   elements.disconnect.hidden = !connected;
-  elements.create.disabled = !connected || state.busy;
+  elements.create.disabled = !connected || state.busy || state.fundingWallet;
 
   if (state.booking) {
     const ownsReceipt = state.connectedAddress === state.booking.owner;
@@ -361,6 +371,8 @@ async function createHold() {
   state.engaged = true;
   setBusy(true);
   try {
+    if (state.walletFundingPromise) await state.walletFundingPromise;
+
     const { transaction } = buildEscrowCreate({
       account: state.connectedAddress,
       destination: config.destination,
@@ -608,7 +620,7 @@ function setBusy(busy) {
   elements.checkIn.disabled = busy;
   elements.walletButton.disabled = busy;
   elements.disconnect.disabled = busy;
-  elements.create.disabled = busy || !state.connectedAddress;
+  elements.create.disabled = busy || state.fundingWallet || !state.connectedAddress;
   elements.mint.disabled = busy || state.connectedAddress !== state.booking?.owner;
   elements.manageAction.disabled = busy || !state.managedAction;
   elements.lookupForm.querySelector('button').disabled = busy;
@@ -651,24 +663,73 @@ function disconnectLedger() {
   void state.ledger.disconnect().catch(() => {});
 }
 
-async function assertAccountCanDeposit(address, amountDrops) {
-  const client = await ledgerClient();
-  let response;
-  try {
-    response = await client.request({
-      command: 'account_info',
-      account: address,
-      ledger_index: 'validated',
-      strict: true,
-    });
-  } catch (error) {
-    if (String(error?.data?.error || error?.message).includes('actNotFound')) {
-      throw new Error('This address is not funded on XRPL Testnet. Use the Testnet faucet first.');
-    }
-    throw error;
+function prepareConnectedWallet(address) {
+  if (config.network !== 'testnet') return Promise.resolve();
+  if (state.walletFundingAddress === address && state.walletFundingPromise) {
+    return state.walletFundingPromise;
   }
 
+  state.fundingWallet = true;
+  state.walletFundingAddress = address;
+  showStatus('Checking Testnet wallet', 'New wallets receive 100 test XRP automatically.', 'working');
+  updateWalletState();
+
+  const promise = ensureConnectedWalletFunded(address);
+  state.walletFundingPromise = promise;
+
+  void promise
+    .then(({ funded, balanceXrp }) => {
+      if (state.connectedAddress !== address) return;
+      state.walletBalanceXrp = balanceXrp;
+      if (funded) {
+        showStatus('Wallet funded', '100 test XRP is ready for this demonstration.', 'success');
+      } else {
+        clearStatus();
+      }
+    })
+    .catch((error) => {
+      if (state.connectedAddress !== address) return;
+      showStatus('Could not fund new wallet', humanError(error), 'error');
+    })
+    .finally(() => {
+      if (state.walletFundingPromise === promise) state.walletFundingPromise = null;
+      if (state.connectedAddress === address) {
+        state.fundingWallet = false;
+        updateWalletState();
+      }
+    });
+
+  return promise;
+}
+
+async function ensureConnectedWalletFunded(address) {
+  const client = await ledgerClient();
+  const result = await ensureTestnetAddressFunded({
+    client,
+    address,
+    faucetUrl: config.faucetApi,
+    amountXrp: '100',
+    onFunding: () => {
+      showStatus(
+        'Funding new Testnet wallet',
+        'Requesting 100 test XRP from the official faucet.',
+        'working',
+      );
+    },
+  });
+  return {
+    funded: result.funded,
+    balanceXrp: String(dropsToXrp(result.accountInfo.result.account_data.Balance)),
+  };
+}
+
+async function assertAccountCanDeposit(address, amountDrops) {
+  const client = await ledgerClient();
+  const response = await readAccountInfo(client, address);
+  if (!response) throw new Error('Automatic Testnet funding did not complete.');
+
   const balance = BigInt(response.result.account_data.Balance);
+  state.walletBalanceXrp = String(dropsToXrp(response.result.account_data.Balance));
   const buffer = BigInt(xrpToDrops('2'));
   if (balance < BigInt(amountDrops) + buffer) {
     throw new Error('At least 52 test XRP is required for the deposit, reserve, and fee.');
@@ -807,8 +868,11 @@ function isTransactionPending(error) {
 
 function humanError(error) {
   const message = String(error?.message || error?.data?.error_message || error || 'Unknown error.');
+  if (/faucet|automatic Testnet funding/i.test(message)) {
+    return 'The official Testnet faucet could not fund this new wallet. Wait a minute, then reconnect it.';
+  }
   if (/actNotFound/i.test(message)) {
-    return `This wallet is not funded on Testnet. Get test XRP at ${config.faucet}.`;
+    return 'This wallet is not active on Testnet yet. Reconnect it to retry automatic funding.';
   }
   if (/tecUNFUNDED|insufficient|52 test XRP/i.test(message)) {
     return 'The wallet needs at least 52 test XRP for the deposit and account reserve.';

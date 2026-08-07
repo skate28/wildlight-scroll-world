@@ -3,12 +3,14 @@
 The final frame of the Wildlight flight reveals a non-custodial XRPL booking flow:
 
 1. Connect an XRPL wallet.
-2. Select a check-in date.
-3. Sign an `EscrowCreate` for 50 XRP.
-4. Wait for a validated ledger.
-5. Optionally sign an `NFTokenMint` receipt linked to the escrow transaction.
-6. After check-in, use the escrow desk to submit `EscrowFinish`.
-7. If the deposit remains unclaimed through checkout plus one day, submit
+2. If the connected address is a new, unfunded Testnet wallet, request 100 test
+   XRP for that same address from the official faucet.
+3. Select a check-in date.
+4. Sign an `EscrowCreate` for 50 XRP.
+5. Wait for a validated ledger.
+6. Optionally sign an `NFTokenMint` receipt linked to the escrow transaction.
+7. After check-in, use the escrow desk to submit `EscrowFinish`.
+8. If the deposit remains unclaimed through checkout plus one day, submit
    `EscrowCancel` to return it to the sender.
 
 The browser never receives a wallet seed. Signing and submission stay inside the
@@ -22,12 +24,13 @@ npm run check
 npx netlify dev
 ```
 
-The default build is an XRPL Testnet demonstration. Obtain valueless test XRP from
-the [XRPL faucet](https://xrpl.org/resources/dev-tools/xrp-faucets).
+The default build is an XRPL Testnet demonstration. Newly created addresses receive
+100 valueless test XRP automatically after connecting. Existing accounts are never
+silently topped up.
 
 Wallets that do not require application credentials are available by default:
 Crossmark, GemWallet, Xyra, and Otsu. To add Xaman, create an application at
-<https://apps.xumm.dev> and set its public API key:
+<https://apps.xaman.dev> and set its public API key:
 
 ```sh
 netlify env:set XRPL_XAMAN_API_KEY your-public-api-key

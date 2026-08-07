@@ -59,8 +59,8 @@
      - clips encoded native-res, crf~20, -g 8, +faststart, no audio (see pipeline.md)
      - connectors' endpoints are the neighbouring dives' ACTUAL frames (see SKILL Step 5)
      - (optional) mobile variants at ~720p, -g 4 for smoother phone scrubbing
-   The engine loads each clip as a Blob (always seekable) and scrubs currentTime; it does
-   NOT depend on HTTP byte-range support.
+   Desktop clips stream from their URLs and require HTTP byte-range support; compact
+   mobile clips load as seekable Blobs. Both paths scrub currentTime.
    ========================================================================== */
 
 function mountScrollWorld(container, config) {
@@ -216,11 +216,14 @@ function mountScrollWorld(container, config) {
     // Serve the lighter mobile encode on phones when one was provided.
     const url = (mobile && s.clipM) ? s.clipM : s.clip;
 
-    function attachVideo(src) {
+    function attachVideo(src, stream = false) {
       const v = document.createElement('video');
       v.className = 'sw-scene__video';
       v.muted = true; v.defaultMuted = true; v.playsInline = true;
-      v.preload = 'auto';
+      // Desktop masters are 9–16 MB. Let the browser request only the metadata
+      // and frame ranges it needs instead of blocking the real camera motion on
+      // a complete Blob download. Phones keep their compact Blob path below.
+      v.preload = stream ? 'metadata' : 'auto';
       v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
       v.addEventListener('loadedmetadata', () => {
         s.ready = true;
@@ -246,6 +249,14 @@ function mountScrollWorld(container, config) {
       s.el.appendChild(v); s.video = v; s.hasClip = true;
       v.src = src;
       v.load();
+    }
+
+    // Desktop browsers seek efficiently against Netlify's byte-range responses.
+    // Attaching the URL immediately restores the real camera flight while the
+    // larger 1080p master streams in around the current scroll position.
+    if (!mobile) {
+      attachVideo(url, true);
+      return;
     }
 
     // The phone masters are deliberately sub-megabyte-to-low-megabyte files.
