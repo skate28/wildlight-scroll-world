@@ -6,7 +6,7 @@
   <title>Wildlight — extraordinary stays</title>
   <meta name="description" content="Scroll to fly through Wildlight — a continuous cinematic walkthrough of extraordinary vacation homes." />
   <link rel="preload" as="fetch" type="video/mp4" href="assets/vid/cabin-mobile-v4.mp4" media="(max-width: 860px)" crossorigin fetchpriority="high" />
-  <link rel="stylesheet" href="booking.css?v=xrpl-escrow-1" />
+  <link rel="stylesheet" href="booking.css?v=xrpl-escrow-2" />
   <style>
     :root, .sw-root {
       --sw-bg: #0B0D10;
@@ -35,7 +35,7 @@
   <div id="top"></div>
   <div id="world"></div>
 
-  <script src="scrub-engine.js?v=film-hq-1"></script>
+  <script src="scrub-engine.js?v=blob-flight-2"></script>
   <script>
     mountScrollWorld(document.getElementById('world'), {
       nav: false,
@@ -98,13 +98,13 @@
         loaded = true;
         window.removeEventListener('scroll', maybeLoadBooking);
         const script = document.createElement('script');
-        script.src = 'booking.bundle.js?v=xrpl-escrow-1';
+        script.src = 'booking.bundle.js?v=xrpl-escrow-2';
         script.async = true;
         document.body.appendChild(script);
       };
       const maybeLoadBooking = () => {
         const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-        if (window.scrollY / max >= 0.55) loadBooking();
+        if (window.scrollY / max >= 0.35) loadBooking();
       };
 
       if (new URLSearchParams(window.location.search).has('receipt')) {

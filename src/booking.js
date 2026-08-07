@@ -317,7 +317,9 @@ if (receiptHashFromUrl) {
 
 function updateReveal() {
   const scrollMax = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-  const atEnd = window.scrollY >= scrollMax - Math.max(24, window.innerHeight * 0.018);
+  const progress = window.scrollY / scrollMax;
+  // Reveal once the visitor reaches the final stay — not only the last few pixels.
+  const atEnd = progress >= 0.88 || window.scrollY >= scrollMax - Math.max(24, window.innerHeight * 0.08);
   const visible = atEnd || state.engaged;
   root.classList.toggle('is-visible', visible);
   root.setAttribute('aria-hidden', String(!visible));

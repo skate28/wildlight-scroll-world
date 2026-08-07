@@ -59,8 +59,8 @@
      - clips encoded native-res, crf~20, -g 8, +faststart, no audio (see pipeline.md)
      - connectors' endpoints are the neighbouring dives' ACTUAL frames (see SKILL Step 5)
      - (optional) mobile variants at ~720p, -g 4 for smoother phone scrubbing
-   Desktop clips stream from their URLs and require HTTP byte-range support; compact
-   mobile clips load as seekable Blobs. Both paths scrub currentTime.
+   The engine loads each clip as a Blob (always seekable) and scrubs currentTime; it does
+   NOT depend on HTTP byte-range support.
    ========================================================================== */
 
 function mountScrollWorld(container, config) {
@@ -150,7 +150,7 @@ function mountScrollWorld(container, config) {
     const poster = (isMobile() && s.stillM) ? s.stillM : s.still;
     if (poster) img.src = poster;
     scene.appendChild(img); stage.appendChild(scene);
-    s.el = scene; s.img = img; s.video = null; s.hasClip = false; s.stream = false;
+    s.el = scene; s.img = img; s.video = null; s.hasClip = false;
     s.loading = false; s.ready = false; s.cur = 0; s.target = 0; s.visible = false;
   });
 
@@ -216,14 +216,11 @@ function mountScrollWorld(container, config) {
     // Serve the lighter mobile encode on phones when one was provided.
     const url = (mobile && s.clipM) ? s.clipM : s.clip;
 
-    function attachVideo(src, stream = false) {
+    function attachVideo(src) {
       const v = document.createElement('video');
       v.className = 'sw-scene__video';
       v.muted = true; v.defaultMuted = true; v.playsInline = true;
-      // Desktop masters are 9–16 MB. Let the browser request only the metadata
-      // and frame ranges it needs instead of blocking the real camera motion on
-      // a complete Blob download. Phones keep their compact Blob path below.
-      v.preload = stream ? 'metadata' : 'auto';
+      v.preload = 'auto';
       v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
       v.addEventListener('loadedmetadata', () => {
         s.ready = true;
@@ -246,22 +243,13 @@ function mountScrollWorld(container, config) {
         if (s.video === v) s.video = null;
         v.remove();
       }, { once: true });
-      s.el.appendChild(v); s.video = v; s.hasClip = true; s.stream = stream;
+      s.el.appendChild(v); s.video = v; s.hasClip = true;
       v.src = src;
       v.load();
     }
 
-    // Desktop browsers seek efficiently against Netlify's byte-range responses.
-    // Attaching the URL immediately restores the real camera flight while the
-    // larger 1080p master streams in around the current scroll position.
-    if (!mobile) {
-      attachVideo(url, true);
-      return;
-    }
-
-    // The phone masters are deliberately sub-megabyte-to-low-megabyte files.
-    // Downloading one into a Blob gives Safari instant local seeks and avoids
-    // repeated/cancelled CDN range requests while a finger is moving.
+    // Compact desktop + mobile masters download into Blobs so every seek is local.
+    // That restores the real camera flight instead of the still-image zoom fallback.
     fetch(url).then(r => r.ok ? r.blob() : Promise.reject(new Error('404')))
       .then(blob => attachVideo(URL.createObjectURL(blob)))
       .catch(() => { s.loading = false; });
@@ -270,10 +258,9 @@ function mountScrollWorld(container, config) {
   function read() {
     const y = window.scrollY || window.pageYOffset;
     const fade = CROSSFADE * vh;
-    // Do not start the next desktop master on the opening frame. Giving the
-    // current clip first use of the connection gets real camera motion onscreen
-    // sooner; the next clip begins preloading partway through the current dive.
-    const prefetch = isMobile() ? 1.35 * vh : 1.0 * vh;
+    // On phones, load only the current/next scene. Starting two full video
+    // transfers at once can starve the first painted frame on cellular.
+    const prefetch = isMobile() ? 1.35 * vh : 1.6 * vh;
     let ci = 0;
     for (let i = 0; i < NSEG; i++) if (y >= SEGMENTS[i].start) ci = i;
 
@@ -330,21 +317,13 @@ function mountScrollWorld(container, config) {
     for (let i = 0; i < NSEG; i++) {
       const s = SEGMENTS[i];
       if (!s.hasClip || !s.ready || !s.video) continue;
-      // Preloaded URL streams should not consume range requests while hidden.
-      // Their latest target is applied once the scene enters the crossfade.
-      if (s.stream && !s.visible) {
-        s.cur = s.target;
-        continue;
-      }
       // Never queue a seek while the decoder is still resolving the last one.
       // On phones a fast flick would otherwise pile up seeks and freeze the clip;
       // cur keeps lerping, so we snap to the latest target the moment it's free.
       if (s.video.seeking) continue;
       const delta = s.target - s.cur;
       if (!s.visible && Math.abs(delta) < 0.002) continue;
-      // A streamed file may need a new byte-range request for every seek. Jump
-      // directly to its latest scroll target instead of queuing many eased seeks.
-      let alpha = (reduce || s.stream) ? 1 : 0.18;
+      let alpha = reduce ? 1 : 0.18;
       if (mobile && !reduce) alpha = Math.abs(delta) > 0.1 ? 0.55 : 0.32;
       s.cur += delta * alpha;
       const dur = s.video.duration || 1;
