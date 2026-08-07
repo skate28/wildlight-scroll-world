@@ -4,4 +4,7 @@ work/
 assets/vid/leg_*.mp4
 assets/vid/*_archa_drift.mp4
 node_modules/
+src/
+scripts/
+test/
 *.ps1

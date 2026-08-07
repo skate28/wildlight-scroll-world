@@ -1,6 +1,7 @@
 # Dependencies / tooling
 node_modules/
 .netlify/
+booking.bundle.js
 .DS_Store
 Thumbs.db
 
